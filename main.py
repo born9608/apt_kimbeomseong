@@ -8,6 +8,13 @@ from sklearn.metrics import recall_score, accuracy_score, f1_score, precision_sc
 from xgboost import XGBClassifier
 
 def define_argparser():
+    """
+    config를 생성합니다
+        target(str): 'target60', 'target70', 'target80', 'target90' 중 하나를 입력받아 저장합니다
+        n_splits(int): train 시 TimeSeriesSplit의 fold 횟수 결정 
+        test_ratio(float): test 데이터 비율
+    """
+    
     p = argparse.ArgumentParser()
 
     p.add_argument('--n_splits', type=int, default=10)
@@ -97,11 +104,7 @@ def train_model(X_train, y_train, target, n_splits):
                       'alpha': 0.0003088636857809953, 'min_child_weight': 1}
     
     model = XGBClassifier(**best_params)
-    tscv = TimeSeriesSplit(n_splits=n_splits)
-    for train_index, valid_index in tscv.split(X_train):
-        train_x, val_x = X_train.iloc[train_index], X_train.iloc[valid_index]
-        train_y, val_y = y_train.iloc[train_index], y_train.iloc[valid_index]
-        model.fit(train_x, train_y)
+    model.fit(X_train, y_train)
     
     return model
 
