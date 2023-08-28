@@ -15,7 +15,7 @@ data폴더에 두가지 데이터가 존재합니다
 2. util.py: 조정대상지역, 투기과열지구 특성을 만드는 함수가 저장된 파일입니다. preprocessing.ipynb에서 사용됩니다
 3. preprocessing.ipynb: region_inter.csv를 전처리해 dataset.csv로 저장합니다
 4. eval_record.ipynb: optuna로 찾은 최적하이퍼파라미터와 각 모델의 성능 평가 결과가 담긴 ipynb이며 joblib으로 인코더와 모델을 저장할 때도 쓰였습니다. 시간이 꽤 오래 걸리므로 재실행은 권장하지 않습니다.
-5. main.py: CLI로 학습 및 성능 평가에 사용됩니다. 유지 보수용입니다. argparse로 받는 변수는 target, test_ratio, n_splits입니다.
+5. main.py: CLI로 학습 및 성능 평가 시 사용됩니다. 유지 보수용입니다. argparse로 받는 변수는 target, test_ratio, n_splits입니다.
 
 CLI input 예시
 
