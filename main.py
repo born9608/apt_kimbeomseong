@@ -95,17 +95,13 @@ def train_model(X_train, y_train, target, n_splits):
                       'subsample': 0.6662096314670163, 'colsample_bytree': 0.9217544827819781,
                       'gamma': 0.27038755382214374, 'lambda': 0.0002866567623589203,
                       'alpha': 0.0003088636857809953, 'min_child_weight': 1}
-    """
+    
     model = XGBClassifier(**best_params)
     tscv = TimeSeriesSplit(n_splits=n_splits)
     for train_index, valid_index in tscv.split(X_train):
         train_x, val_x = X_train.iloc[train_index], X_train.iloc[valid_index]
         train_y, val_y = y_train.iloc[train_index], y_train.iloc[valid_index]
         model.fit(train_x, train_y)
-    
-    """
-    model = XGBClassifier(**best_params)
-    model.fit(X_train, y_train)
     
     return model
 
