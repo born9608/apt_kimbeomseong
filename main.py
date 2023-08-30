@@ -1,6 +1,7 @@
 import argparse
 
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import  LabelEncoder
 from sklearn.model_selection import TimeSeriesSplit, train_test_split
 from sklearn.metrics import recall_score, accuracy_score, f1_score, precision_score
@@ -63,8 +64,13 @@ def split_data(data, target, test_size=0.2):
     target_list.remove(target)
     data = data.drop(columns=target_list)
 
+    if target == 'target80':
+        # target80인 경우 면적당보증금을 log변환 시켜줘야함(이유는 파악하지 못했으나 성능이 극적으로 차이남)
+        data['log_면적당보증금'] = np.log(data['면적당보증금'])
+        data.drop(columns='면적당보증금', inplace=True)
+
     # split
-    X_train, X_test, y_train, y_test = train_test_split(data.drop(target, axis=1), data[target], test_size=test_size)
+    X_train, X_test, y_train, y_test = train_test_split(data.drop(target, axis=1), data[target], test_size=test_size, shuffle=False)
     return X_train, X_test, y_train, y_test
 
 def train_model(X_train, y_train, target, n_splits):
@@ -130,11 +136,8 @@ if __name__ == '__main__':
     config = define_argparser()
 
     data = load_data('data/dataset.csv')
-
     X_train, X_test, y_train, y_test = split_data(data, config.target, config.test_ratio)
-
     model = train_model(X_train, y_train, config.target, config.n_splits)
-
     recall, f1, accuracy, precision = evaluate_model(model, X_test, y_test)
 
     # config로 받은 값과 평가 성능 출력
