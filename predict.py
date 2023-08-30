@@ -25,42 +25,38 @@ def get_user_input():
         else:
             print("잘못된 입력입니다. 'y' 또는 'n'만 입력하세요.")
 
-def define_argparser():
-    """
-    config를 생성합니다
-        target(str): 'target60', 'target70', 'target80', 'target90' 중 하나를 입력받아 저장합니다
-        n_splits(int): train 시 TimeSeriesSplit의 fold 횟수 결정
-        test_ratio(float): test 데이터 비율
-    """
-    p = argparse.ArgumentParser()
-
-    p.add_argument('--n_splits', type=int, default=10)
-    p.add_argument('--test_ratio', type=float, default=0.2)
-    p.add_argument('--target', type=str, choices=['target60', 'target70', 'target80', 'target90'], default='target70')
-    config = p.parse_args()
-
-    return config
-
 class Model:
 
-    def __init__(self, target, config=None):
+    def __init__(self, target, train_model=0):
+        # train_model: 학습 여부(0이면 joblib에서 불러온다, 1이면 새로 학습한다)
+        # target: 사용할 target
+        self.target = target
+        self.train_model = train_model
         self.params = {}
         self.model = None
-        self.target = target
-        self.config = config
 
         # 모델 불러오기
-        # 성공시 미리 저장한 모델.joblib을 불러와 예측 진행
-        # 실패시 하이퍼파라미터 기본 값으로 학습 진행
+        # train_model = 0이면 저장된 모델을 불러오고 로드에 실패하면 학습을 진행한다
+        if self.train_model == 0:
+            file_path = os.path.join(f'save/apt_{self.target}.joblib')
+            if os.path.exists(file_path):
+                self.model = joblib.load(file_path)
+                self.params = self.model.get_params()
+                print('모델 불러오기 성공')
+            else:
+                print('모델 불러오기 실패')
+                self.model, train_time = self.train()
+                self.params = self.model.get_params()
+                
+                # 학습 소요시간 print. 0.1초보다 작으면 ms단위로
+                if train_time < 0.1:
+                    print(f'모델학습 완료. 소요시간 {train_time:.2f}')
+                else:
+                    print(f'모델학습 완료. 소요시간 {train_time*1000:.2f}ms')
 
-        file_path = os.path.join(f'save/apt_{self.target}.joblib')
-        if os.path.exists(file_path):
-            self.model = joblib.load(file_path)
-            self.params = self.model.get_params()
-            print('모델 불러오기 성공')
+        # train_model = 1이면 학습을 진행한다
         else:
-            print('모델 불러오기 실패')
-            self.model, train_time = self.train(self.params, self.config)
+            self.model, train_time = self.train()
             self.params = self.model.get_params()
             
             # 학습 소요시간 print. 0.1초보다 작으면 ms단위로
@@ -95,7 +91,7 @@ class Model:
 
         return data 
     
-    def _split_data(self, data, config):
+    def _split_data(self, data):
         """
         훈련과 평가 데이터를 나눕니다
         Args:
@@ -104,42 +100,67 @@ class Model:
         Returns:
             split을 진행함과 동시에 x, y 분리
         """
-        # config에 저장된 target들 불러오고 변수선언
-        target = config.target
-
+        
         # 지정한 target을 제외하고 모두 drop
         target_list = ['target60', 'target70' ,'target80', 'target90']
-        target_list.remove(target)
+        target_list.remove(self.target)
         data = data.drop(columns=target_list)
 
-        if target in ['target80', 'target70']:
+        if self.target in ['target80', 'target70']:
             # target80인 경우 면적당보증금을 log변환 시켜줘야함(이유는 짐작하지 못했으나 성능이 우세함)
             data['log_면적당보증금'] = np.log(data['면적당보증금'])
             data.drop(columns='면적당보증금', inplace=True)        
 
         # split
-        X_train, X_test, y_train, y_test = train_test_split(data.drop(columns = target), data[target], test_size=config.test_ratio, shuffle=False)
-
+        X_train, X_test, y_train, y_test = train_test_split(data.drop(columns = self.target), data[self.target], test_size=0.2, shuffle=False)
         return X_train, X_test, y_train, y_test
 
-    def train(self, params, config):
+    def train(self):
         """
         load_data로 데이터셋을 불러오고 split_data로 x_train,x_test... 로 데이터를 분리한 뒤 타겟에 맞게 학습을 진행합니다
         Arg:
-            config: 입력된 설정
+            target: 사용할 target
         Returns:
             model: 학습한 모델
             train_time: 학습 소요 시간
         """
 
+        # target변수 선언 
+        target = self.target
+
+        # default 하이퍼파라미터 설정
+        if target == 'target60':
+            default_params = {'n_estimators': 228, 'max_depth': 10, 'learning_rate': 0.0768583812353364, 
+                        'subsample': 0.9662229301474877, 'colsample_bytree': 0.9785005736064512, 
+                        'gamma': 0.30686503400500115, 'lambda': 3.522762852015552e-08, 
+                        'alpha': 2.2796151107527633e-08, 'min_child_weight': 1}
+        
+        elif target == 'target70':
+            default_params = {'n_estimators': 215, 'max_depth': 10, 'learning_rate': 0.16077919807440758,
+                        'subsample': 0.9135532693912264, 'colsample_bytree': 0.7197754959056628,
+                        'gamma': 0.32176155905630405, 'lambda': 8.057588898109088e-07,
+                        'alpha': 0.0013400305230964816, 'min_child_weight': 1}
+        
+        elif target == 'target80':
+            default_params = {'n_estimators': 225, 'max_depth': 12, 'learning_rate': 0.08434351267106448,
+                        'subsample': 0.9603746784124344, 'colsample_bytree': 0.6839618527946499,
+                        'gamma': 0.18450648730656335, 'lambda': 0.03916943898020069,
+                        'alpha': 0.007893206304307562, 'min_child_weight': 1}
+        
+        elif target == 'target90':
+            default_params = {'n_estimators': 128, 'max_depth': 4, 'learning_rate': 0.02698777567422039,
+                        'subsample': 0.6662096314670163, 'colsample_bytree': 0.9217544827819781,
+                        'gamma': 0.27038755382214374, 'lambda': 0.0002866567623589203,
+                        'alpha': 0.0003088636857809953, 'min_child_weight': 1}
+
         # 데이터셋 불러오기
         data = self._load_data()
-        
+
         # 데이터셋 split
-        x_train, _, y_train, _ = self._split_data(data, config)
+        x_train, _, y_train, _ = self._split_data(data)
 
         # XGBClassifier로 모델 선언 및 학습
-        model = XGBClassifier(**params)
+        model = XGBClassifier(**default_params)
     
         # 학습 소요시간
         t1 = time.time()
@@ -151,6 +172,7 @@ class Model:
 
     def evaluate(self, model, x_test, y_test):
         """
+        !!! 웹에서 쓰이지 않음 !!!
         모델을 평가합니다
         Args:
             model: 평가할 모델
@@ -173,6 +195,7 @@ class Model:
     
     def trainer(self, config):
         """
+        !!! 웹에서 쓰이지 않음 !!!
         앞서 정의된 4가지 사용자 정의함수를 이용해 학습을 진행하고 모델 성능을 평가함
         Args:
             config: 입력된 설정
@@ -298,6 +321,11 @@ class Model:
         Returns:
             pred: 예측값
         """
+
+        # target70, target80 모델로 예측할 땐 input의 면적당보증금(deposit)을 로그변환해서 넣어야함
+        if self.target in ['target70', 'target80']:
+            input[-1] = np.log(input[-1])
+
         pred = self.model.predict(input)
         return pred
     
@@ -333,7 +361,13 @@ def input_data():
 
 # Main!!! 
 if __name__ == '__main__':   
+    
+    # 입력 받기
     response = get_user_input()
+
+    # 새로 학습해서 예측할지->1, 저장된 모델로 예측할지 -> 0 결정
+    train_model = 0
+    
     if response == 'y':
         
         # 입력값 받기
@@ -341,7 +375,7 @@ if __name__ == '__main__':
 
         rate = 50
         for i in ['target60', 'target70', 'target80', 'target90']:
-            model = Model(target=i)
+            model = Model(i, train_model)
             prediction = model.predict(input)
             if prediction == 1:
                 if i == 'target60':
